@@ -23,11 +23,19 @@ def _resolve_home() -> Path:
     """
     env_home = os.getenv("SELVES_HOME")
     if env_home:
-        p = Path(env_home).expanduser()
+        # Guard against a malformed .env value like "SELVES_HOME=/Users/..." where the
+        # variable name leaked into the value.
+        cleaned = env_home.strip().strip('"').strip("'")
+        if cleaned.startswith("SELVES_HOME="):
+            cleaned = cleaned.split("=", 1)[1]
+        p = Path(cleaned).expanduser()
+        # The definitive test: a valid home contains eras.yaml.
+        if (p / "eras.yaml").exists():
+            return p
         if p.exists():
             return p
         print(
-            f"[config] SELVES_HOME='{env_home}' does not exist; "
+            f"[config] SELVES_HOME='{env_home}' is invalid (no eras.yaml there); "
             f"falling back to repo root {ROOT}. Fix SELVES_HOME in .env."
         )
     return ROOT
