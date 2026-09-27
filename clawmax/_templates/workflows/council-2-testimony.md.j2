@@ -1,0 +1,23 @@
+---
+id: council-2-testimony
+name: Council 2 — Testimony
+description: Each past self testifies on the current dilemma from its own time-sliced memory
+schedule: manual
+enabled: true
+executionMode: automated
+targeting:
+  tags:
+    - self
+author: Council of Selves
+# dependsOn: [council-1-brief]   # VERIFY exact DAG field name/shape against the spec
+---
+
+# Testimony
+
+1. Run `selves session current` and `selves session show`.
+2. Follow your SOUL.md exactly: `selves voice --as <your era>` once, then
+   `selves recall --as <your era>` at least 3 times (the dilemma; what I valued and feared;
+   any similar choice I faced). Only ever use `--as <your own era id>`.
+3. Write `$SELVES_HOME/sessions/<id>/10_testimony_<your era id>.md` using the template
+   (first line after the title is `**Vote:** <A or B or C or CONDITIONAL-X: condition>`).
+4. Reply `DONE <era id> vote=<vote>`.

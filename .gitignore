@@ -1,0 +1,37 @@
+# Secrets — NEVER commit
+.env
+.env.local
+
+# Personal data stays local
+data/mine/
+data/inbox/*
+!data/inbox/.gitkeep
+
+# Cognee stores
+.cognee/
+
+# Runtime session output
+sessions/*
+!sessions/.gitkeep
+
+# ClawMax rendered output
+clawmax/build/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.uv/
+build/
+dist/
+
+# pyenv local pin (machine-specific)
+.python-version
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/

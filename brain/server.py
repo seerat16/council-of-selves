@@ -1,0 +1,225 @@
+"""FastAPI brain server (port 8765). The ONLY process that touches Cognee.
+
+All Cognee writes (ingest, record_decision, record_outcome) are serialized behind a
+single asyncio.Lock. Recall/history/voice are reads and run without the write lock.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from datetime import date
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, HTMLResponse
+from pydantic import BaseModel, ConfigDict, Field
+
+from . import config, records
+from .config import WEB_DIR
+from .eras import load_eras, owner
+
+app = FastAPI(title="Council of Selves — Brain", version="0.1.0")
+
+# Serialize all Cognee writes.
+_WRITE_LOCK = asyncio.Lock()
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    config.configure_cognee()
+
+
+# --------------------------------------------------------------------------- models
+class IngestBody(BaseModel):
+    path: str | None = None
+    reset: bool = False
+    inbox: bool = False
+
+
+class RecallBody(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    as_: str | None = Field(default=None, alias="as")
+    q: str
+    k: int = 6
+
+
+class VoiceBody(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    as_: str | None = Field(default=None, alias="as")
+
+
+class HistoryBody(BaseModel):
+    q: str
+
+
+class SessionBody(BaseModel):
+    dilemma: str
+    mode: str = "local"  # "local" | "clawmax"
+
+
+class OutcomeBody(BaseModel):
+    rating: int
+    text: str
+    today: str | None = None
+
+
+# --------------------------------------------------------------------------- eras
+@app.get("/api/eras")
+async def api_eras() -> dict:
+    return {"owner": owner(), "eras": [e.to_dict() for e in load_eras()]}
+
+
+@app.get("/api/stats")
+async def api_stats() -> dict:
+    """Entry counts per era dataset + timeline, derived from the corpus on disk.
+
+    These are the *expected* cumulative counts (12/24/36/48 for the seed persona);
+    the actual cognified document counts should match after `selves ingest --reset`.
+    """
+    from .entries import load_entries
+
+    entries = load_entries(config.DATA_DIR)
+    per_dataset: dict[str, int] = {}
+    for era in load_eras():
+        per_dataset[era.dataset] = len([e for e in entries if e.date <= era.end])
+    per_dataset[config.TIMELINE_DATASET] = len(entries)
+    return {
+        "data_dir": str(config.DATA_DIR),
+        "total_entries": len(entries),
+        "datasets": per_dataset,
+        "sessions": len(records.list_sessions()),
+    }
+
+
+# --------------------------------------------------------------------------- ingest
+@app.post("/api/ingest")
+async def api_ingest(body: IngestBody) -> dict:
+    from . import ingest as ingest_mod
+    from pathlib import Path
+
+    async with _WRITE_LOCK:
+        if body.inbox:
+            return await ingest_mod.ingest_inbox()
+        path = Path(body.path) if body.path else config.DATA_DIR
+        return await ingest_mod.ingest_all(path=path, reset=body.reset)
+
+
+# --------------------------------------------------------------------------- recall
+@app.post("/api/recall")
+async def api_recall(body: RecallBody) -> dict:
+    from . import recall as recall_mod
+
+    era_id = body.as_ or "now"
+    try:
+        return await recall_mod.recall_as(era_id, body.q, k=body.k)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown era: {era_id}")
+
+
+@app.post("/api/voice")
+async def api_voice(body: VoiceBody) -> dict:
+    from . import recall as recall_mod
+
+    era_id = body.as_ or "now"
+    try:
+        return await recall_mod.voice(era_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown era: {era_id}")
+
+
+@app.post("/api/history")
+async def api_history(body: HistoryBody) -> dict:
+    from . import recall as recall_mod
+
+    return await recall_mod.history(body.q)
+
+
+# --------------------------------------------------------------------------- sessions
+@app.post("/api/sessions")
+async def api_new_session(body: SessionBody) -> dict:
+    session = records.new_session(body.dilemma)
+    if body.mode == "local":
+        # Run Plan B end-to-end as a background task. It writes to Cognee only at
+        # record_decision, guarded by the shared write lock passed in.
+        asyncio.create_task(_run_local(session["id"], body.dilemma))
+        session["mode"] = "local"
+        session["note"] = "Plan B council running in background; poll this session."
+    else:
+        session["mode"] = "clawmax"
+        session["note"] = "Run council-1-brief in ClawMax to begin."
+    return session
+
+
+async def _run_local(session_id: str, dilemma: str) -> None:
+    from . import council_local
+
+    try:
+        await council_local.run_council(dilemma, session_id=session_id, write_lock=_WRITE_LOCK)
+    except Exception as exc:  # noqa: BLE001
+        records.set_status(session_id, "error")
+        print(f"[server] local council failed for {session_id}: {exc}")
+
+
+@app.get("/api/sessions")
+async def api_list_sessions() -> list[dict]:
+    return records.list_sessions()
+
+
+@app.get("/api/sessions/{session_id}")
+async def api_get_session(session_id: str) -> dict:
+    try:
+        return records.read_session(session_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="session not found")
+
+
+@app.post("/api/sessions/{session_id}/decision")
+async def api_decision(session_id: str) -> dict:
+    async with _WRITE_LOCK:
+        try:
+            return await records.record_decision(session_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/sessions/{session_id}/outcome")
+async def api_outcome(session_id: str, body: OutcomeBody) -> dict:
+    today = date.fromisoformat(body.today) if body.today else None
+    async with _WRITE_LOCK:
+        return await records.record_outcome(session_id, body.rating, body.text, today=today)
+
+
+@app.get("/api/due")
+async def api_due(today: str | None = None) -> list[dict]:
+    d = date.fromisoformat(today) if today else date.today()
+    return records.due(d)
+
+
+# --------------------------------------------------------------------------- graph + UI
+@app.get("/graph", response_class=HTMLResponse)
+async def api_graph() -> HTMLResponse:
+    """Cognee graph visualization. VERIFY the visualize API against installed cognee."""
+    try:
+        import cognee
+
+        # Newer cognee: cognee.visualize_graph() returns HTML or writes a file.
+        html = await cognee.visualize_graph()  # type: ignore
+        if isinstance(html, str) and "<html" in html.lower():
+            return HTMLResponse(html)
+        # If it wrote a file path, read it.
+        from pathlib import Path
+
+        p = Path(str(html))
+        if p.exists():
+            return HTMLResponse(p.read_text())
+        return HTMLResponse(f"<pre>graph rendered to: {html}</pre>")
+    except Exception as exc:  # noqa: BLE001
+        return HTMLResponse(
+            f"<h3>Graph visualization unavailable</h3><pre>{exc}</pre>"
+            "<p>VERIFY cognee.visualize_graph() against the installed version.</p>",
+            status_code=200,
+        )
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index() -> FileResponse:
+    return FileResponse(str(WEB_DIR / "index.html"))

@@ -1,0 +1,25 @@
+---
+id: council-1-brief
+name: Council 1 — Brief
+description: The Chair restates the dilemma neutrally and lists options
+schedule: manual
+enabled: true
+executionMode: automated
+targeting:
+  agents:
+    - chair
+inputs:
+  - key: dilemma
+    label: The decision you're facing
+    kind: text
+    required: true
+author: Council of Selves
+---
+
+# Brief
+
+1. Run `selves session new "{{ '{{ dilemma }}' }}"` (or `selves session current` if it exists).
+2. Run `selves recall --as now` 2-3 times to learn what present-day {{ owner }} has said.
+3. Follow your SOUL.md and write `$SELVES_HOME/sessions/<id>/00_brief.md` (neutral dilemma,
+   options A/B/C, stakes, deadline, what present-me has said with [YYYY-MM-DD] citations).
+4. Reply `DONE chair — brief ready, session=<id>`.

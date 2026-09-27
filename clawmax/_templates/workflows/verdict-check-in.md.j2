@@ -1,0 +1,23 @@
+---
+id: verdict-check-in
+name: Verdict Check-in
+description: Surface decisions whose check-back date is due and ask for the outcome
+schedule: "0 9 * * *"
+enabled: true
+executionMode: automated
+targeting:
+  agents:
+    - chair
+author: Council of Selves
+---
+
+# Verdict Check-in
+
+1. Run `selves due` (optionally `selves due --today YYYY-MM-DD` for a demo simulation).
+2. For each due session, write `$SELVES_HOME/sessions/<id>/95_checkin.md` — a short, kind
+   question to {{ owner }} plus a link to the outcome form
+   (`$SELVES_BRAIN_URL/?session=<id>#checkins`).
+3. Raise a ClawMax notification asking {{ owner }} to record how it turned out.
+
+When {{ owner }} records the outcome, it is written to `council_records`, `asof_now` and
+`timeline`, so the next council's Historian can cite which self was right.

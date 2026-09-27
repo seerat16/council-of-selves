@@ -1,0 +1,41 @@
+---
+name: Council of Selves
+type: organization
+version: 1.0.0
+category: Personal
+author: {{ owner }}
+tags: [personal-brain, cognee, decisions, memory, time-travel]
+secretRequirements:
+  - key: SELVES_BRAIN_URL
+    label: Council of Selves brain server URL
+    kind: url
+    required: true
+    sensitive: false
+    placeholder: http://localhost:8765
+---
+
+# Council of Selves
+
+Convene your past selves, each rebuilt from only what you knew at the time, to deliberate
+on a decision. Powered by Cognee time-sliced memory.
+
+## Agents
+
+| id | name | role | tags | skills |
+|----|------|------|------|--------|
+| chair | The Chair | Convenes, briefs, writes the verdict | council,chair | selves-brain |
+| historian | The Historian | Patterns, base rates, contradictions | council,historian | selves-brain |
+{% for e in past_eras -%}
+| self-{{ e.id }} | {{ owner }}, {{ e.name }} | Past self as of {{ e.end }} | council,self | selves-brain |
+{% endfor %}
+## Communities
+- **Council Chamber** — where one dilemma at a time is deliberated
+
+## Groups
+- **Selves** — past-self agents (Council Chamber)
+- **Records** — Chair and Historian (Council Chamber)
+
+## Workflows
+- council-1-brief (manual) → council-2-testimony ‖ council-2-history → council-3-cross → council-4-verdict
+- memory-sync (cron, every 6h)
+- verdict-check-in (cron, daily 09:00)

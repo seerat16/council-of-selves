@@ -1,0 +1,28 @@
+owner: Alex
+timezone: America/New_York
+eras:
+  - id: grind-fall
+    name: "Grind Fall '25"
+    start: 2025-09-01
+    end: 2025-11-30
+    color: "#F59E0B"
+    blurb: "Shipping nonstop at the startup; sure that speed is everything."
+  - id: burnout-winter
+    name: "Burnout Winter"
+    start: 2025-12-01
+    end: 2026-02-28
+    color: "#60A5FA"
+    blurb: "Crashed. Therapy, running, relearning what 'enough' means."
+  - id: launch-spring
+    name: "Launch Spring"
+    start: 2026-03-01
+    end: 2026-05-31
+    color: "#34D399"
+    blurb: "Rebuilt; launched Tiny Ledger on the side; confident and restless."
+  - id: now
+    name: "Now"
+    start: 2026-06-01
+    end: 2026-09-30
+    color: "#A78BFA"
+    present: true
+    blurb: "Stable-ish. Hungry to learn from someone better than me."

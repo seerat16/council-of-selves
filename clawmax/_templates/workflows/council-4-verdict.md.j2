@@ -1,0 +1,24 @@
+---
+id: council-4-verdict
+name: Council 4 — Verdict
+description: The Chair tallies votes and writes the Decision Memo, then records it to memory
+schedule: manual
+enabled: true
+executionMode: automated
+targeting:
+  agents:
+    - chair
+author: Council of Selves
+# dependsOn: [council-3-cross]   # VERIFY DAG field/shape
+---
+
+# Verdict
+
+1. Run `selves session show` and read EVERY file in the session folder. If any expected
+   file is missing (a testimony, a cross, or the history), re-request it once from the
+   responsible agent before proceeding.
+2. Follow your SOUL.md and write `$SELVES_HOME/sessions/<id>/90_verdict.md` (the Decision
+   Memo). It MUST contain the line `Check back: YYYY-MM-DD`.
+3. Run `selves record decision` to store the verdict in Cognee memory and set the
+   check-back date.
+4. Reply `DONE chair — verdict written, leaning=<option>`.

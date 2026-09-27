@@ -1,0 +1,27 @@
+# TOOLS — {{ name }}
+
+Primary tool: the **selves-brain** skill (shell exec of the `selves` CLI, or curl to
+`$SELVES_BRAIN_URL`).
+
+Allowed commands for this agent:
+{% if agent_id.startswith("self-") %}
+- `selves session current` / `selves session show`
+- `selves recall --as {{ era.id }} -q "..."`
+- `selves voice --as {{ era.id }}`
+{% elif agent_id == "historian" %}
+- `selves session current` / `selves session show`
+- `selves history -q "..."`
+{% elif agent_id == "chair" %}
+- `selves session new "..."` / `selves session current` / `selves session show`
+- `selves recall --as now -q "..."`
+- `selves history -q "..."`
+- `selves record decision`
+- `selves due`
+{% endif %}
+
+Runtime note: agents need shell exec to run `selves`. If OpenClaw exec is blocked or
+flaky, pin this agent to the Claude Code runtime (`- **Runtime:** claude`, which needs
+`ANTHROPIC_API_KEY`) — it runs shell and file writes natively.
+
+Do NOT enable the cognee-openclaw plugin's autoRecall on self agents; it would inject
+cross-era memory and break time isolation.
