@@ -55,8 +55,17 @@ TIMELINE_DATASET = "timeline"
 OWNER = os.getenv("SELVES_OWNER", "Alex")
 BRAIN_URL = os.getenv("SELVES_BRAIN_URL", "http://localhost:8765")
 
-CHAIR_MODEL = os.getenv("SELVES_CHAIR_MODEL", "claude-sonnet-5")
-SELF_MODEL = os.getenv("SELVES_SELF_MODEL", "claude-haiku-4-5-20251001")
+# Council LLM provider: "anthropic" (default) or "ollama" (free, local).
+COUNCIL_PROVIDER = os.getenv("SELVES_LLM_PROVIDER", "anthropic").lower()
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
+
+# Model names differ by provider; defaults suit each.
+if COUNCIL_PROVIDER == "ollama":
+    CHAIR_MODEL = os.getenv("SELVES_CHAIR_MODEL", "llama3.1")
+    SELF_MODEL = os.getenv("SELVES_SELF_MODEL", "llama3.1")
+else:
+    CHAIR_MODEL = os.getenv("SELVES_CHAIR_MODEL", "claude-sonnet-5")
+    SELF_MODEL = os.getenv("SELVES_SELF_MODEL", "claude-haiku-4-5-20251001")
 
 COGNEE_DATA = HOME / ".cognee/data"
 COGNEE_SYSTEM = HOME / ".cognee/system"

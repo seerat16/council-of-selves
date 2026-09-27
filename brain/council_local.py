@@ -17,29 +17,59 @@ import re
 from datetime import date
 from pathlib import Path
 
-from anthropic import AsyncAnthropic
+import httpx
 
-from . import records
+from . import config, records
 from .config import CHAIR_MODEL, OWNER, SELF_MODEL, SESSIONS_DIR
 from .eras import past_eras, present_era
 from .prompts import load_prompt
 from .recall import history, recall_as, voice
 
-_client = AsyncAnthropic()
-
 VOTE_RE = re.compile(r"^\*\*Vote:\*\*\s*(.+)$", re.M | re.I)
 CITE_RE = re.compile(r"\[\d{4}-\d{2}-\d{2}\]")
 CHANGED_RE = re.compile(r"\*\*Changed:\*\*\s*(yes|no)", re.I)
 
+_anthropic_client = None  # lazily created only if the anthropic provider is used
 
-async def llm(model: str, system: str, user: str, max_tokens: int = 1600) -> str:
-    msg = await _client.messages.create(
+
+async def _llm_anthropic(model: str, system: str, user: str, max_tokens: int) -> str:
+    global _anthropic_client
+    if _anthropic_client is None:
+        from anthropic import AsyncAnthropic
+
+        _anthropic_client = AsyncAnthropic()
+    msg = await _anthropic_client.messages.create(
         model=model,
         max_tokens=max_tokens,
         system=system,
         messages=[{"role": "user", "content": user}],
     )
     return "".join(b.text for b in msg.content if getattr(b, "type", None) == "text")
+
+
+async def _llm_ollama(model: str, system: str, user: str, max_tokens: int) -> str:
+    """Call Ollama via its OpenAI-compatible /chat/completions endpoint (no key needed)."""
+    async with httpx.AsyncClient(base_url=config.OLLAMA_URL, timeout=600) as c:
+        r = await c.post(
+            "/chat/completions",
+            json={
+                "model": model,
+                "max_tokens": max_tokens,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            },
+        )
+        r.raise_for_status()
+        data = r.json()
+        return data["choices"][0]["message"]["content"]
+
+
+async def llm(model: str, system: str, user: str, max_tokens: int = 1600) -> str:
+    if config.COUNCIL_PROVIDER == "ollama":
+        return await _llm_ollama(model, system, user, max_tokens)
+    return await _llm_anthropic(model, system, user, max_tokens)
 
 
 def _dir(session_id: str) -> Path:
