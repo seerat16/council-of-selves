@@ -9,8 +9,10 @@ from __future__ import annotations
 import asyncio
 from datetime import date
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+import traceback
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import config, records
@@ -21,6 +23,18 @@ app = FastAPI(title="Council of Selves — Brain", version="0.1.0")
 
 # Serialize all Cognee writes.
 _WRITE_LOCK = asyncio.Lock()
+
+
+@app.exception_handler(Exception)
+async def _all_errors(request: Request, exc: Exception) -> JSONResponse:
+    """Surface the real error (type, message, traceback) to the client instead of a
+    bare 500, and print it server-side too. Makes debugging far easier."""
+    tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    print(tb)
+    return JSONResponse(
+        status_code=500,
+        content={"error": type(exc).__name__, "detail": str(exc), "traceback": tb[-4000:]},
+    )
 
 
 @app.on_event("startup")

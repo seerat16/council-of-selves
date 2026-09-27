@@ -33,7 +33,13 @@ def _get(path: str, **params):
 def _post(path: str, body: dict):
     with httpx.Client(base_url=BRAIN_URL, timeout=600) as c:
         r = c.post(path, json=body)
-        r.raise_for_status()
+        if r.status_code >= 400:
+            # Print the server's error body (now includes type/detail/traceback).
+            try:
+                _print(r.json())
+            except Exception:  # noqa: BLE001
+                typer.echo(r.text)
+            raise typer.Exit(1)
         return r.json()
 
 
