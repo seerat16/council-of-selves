@@ -15,7 +15,25 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
 
-HOME = Path(os.getenv("SELVES_HOME", str(ROOT)))
+def _resolve_home() -> Path:
+    """Use SELVES_HOME if it exists; otherwise fall back to the repo root.
+
+    Guards against the .env.example placeholder (/home/you/...) being left in place,
+    which would otherwise crash Cognee store creation on non-Linux machines.
+    """
+    env_home = os.getenv("SELVES_HOME")
+    if env_home:
+        p = Path(env_home).expanduser()
+        if p.exists():
+            return p
+        print(
+            f"[config] SELVES_HOME='{env_home}' does not exist; "
+            f"falling back to repo root {ROOT}. Fix SELVES_HOME in .env."
+        )
+    return ROOT
+
+
+HOME = _resolve_home()
 DATA_DIR = HOME / os.getenv("SELVES_DATA", "data/seed")
 INBOX_DIR = HOME / "data/inbox"
 SESSIONS_DIR = HOME / "sessions"
