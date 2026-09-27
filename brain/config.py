@@ -35,6 +35,17 @@ SELF_MODEL = os.getenv("SELVES_SELF_MODEL", "claude-haiku-4-5-20251001")
 COGNEE_DATA = HOME / ".cognee/data"
 COGNEE_SYSTEM = HOME / ".cognee/system"
 
+# --- Hosted Cognee tenant (platform.cognee.ai) ---
+# When both are set, `cognee.serve()` picks them up from the environment and the
+# `selves push` command uploads the locally-built sliced datasets to your tenant.
+COGNEE_SERVICE_URL = os.getenv("COGNEE_SERVICE_URL")  # e.g. https://<tenant>.aws.cognee.ai
+COGNEE_API_KEY = os.getenv("COGNEE_API_KEY")
+
+
+def cognee_cloud_enabled() -> bool:
+    return bool(COGNEE_SERVICE_URL and COGNEE_API_KEY)
+
+
 _cognee_configured = False
 
 
@@ -61,3 +72,25 @@ def configure_cognee() -> None:
         cognee.config.set("data_root_directory", str(COGNEE_DATA))
         cognee.config.set("system_root_directory", str(COGNEE_SYSTEM))
     _cognee_configured = True
+
+
+async def connect_cloud() -> bool:
+    """Attach the SDK to your hosted Cognee tenant via `cognee.serve()`.
+
+    Per the Cognee docs, `cognee.serve()` reads COGNEE_SERVICE_URL + COGNEE_API_KEY
+    from the environment (already loaded from .env above). We also pass them
+    explicitly as a belt-and-braces fallback. No-op (returns False) if the tenant
+    env vars aren't set, so the local-only flow is unaffected.
+
+    VERIFY: `cognee.serve()` kwarg names (url/api_key) against your installed version.
+    """
+    if not cognee_cloud_enabled():
+        return False
+    import cognee
+
+    try:
+        await cognee.serve(url=COGNEE_SERVICE_URL, api_key=COGNEE_API_KEY)
+    except TypeError:
+        # Some versions read only from env vars and take no kwargs.
+        await cognee.serve()
+    return True

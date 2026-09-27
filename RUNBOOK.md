@@ -63,23 +63,47 @@ Edit `.env` and fill in:
 
 Keep `SELVES_DATA=data/seed` for the public demo.
 
-### Cognee platform (platform.cognee.ai) — optional, stretch goal
+### Cognee hosted tenant (platform.cognee.ai)
 
-For the local hackathon build you do **not** need the hosted platform — Cognee runs
-in-process from the `cognee` pip package using your OpenAI key, storing its graph/vector
-data under `.cognee/` in this repo.
+The build **cognifies locally** (cheap, uses your OpenAI key, stores under `.cognee/`),
+then **pushes the already-sliced datasets** to your tenant. Slicing is preserved because
+it's baked into the dataset names (`asof_grind_fall` etc.), so they arrive on the tenant
+still time-sliced — and your local **leak test** already proved the isolation.
 
-Use the hosted platform only for the **stretch goal** of pushing datasets to the cloud:
+**Auth (from the Cognee docs):** the SDK attaches to a tenant with `cognee.serve()`,
+which reads these env vars. Add them to `.env` (get the values from your tenant / the
+VS Code extension settings; **never commit the key**):
 
-1. Sign in at <https://platform.cognee.ai> and create/confirm your account.
-2. Create an API key in the dashboard and put it in `.env` as `COGNEE_API_KEY` (uncomment
-   the line in `.env.example`).
-3. Apply the **$35 onsite credits** to your account.
-4. After a successful local ingest, push (VERIFY the exact call against installed cognee):
-   ```bash
-   uv run python -c "import asyncio, cognee; asyncio.run(cognee.push(datasets=['asof_now','timeline']))"
-   ```
-5. View the datasets in the Cognee Cloud UI.
+```bash
+COGNEE_SERVICE_URL=https://<your-tenant>.aws.cognee.ai
+COGNEE_API_KEY=...
+```
+
+When both are set, the brain server calls `cognee.serve(url=..., api_key=...)` at startup
+and enables the push command:
+
+```bash
+# 1) build + prove locally FIRST (see §4–§5)
+uv run selves ingest --reset
+uv run python scripts/leak_test.py       # 16/16 green
+
+# 2) push all sliced datasets to your tenant (server must be running)
+uv run selves push                       # or: selves push --dataset asof_now --dataset timeline
+```
+
+Then view the sliced datasets in the Cognee platform UI. Recall/history still run against
+your **local** datasets by default (fast, and guarded by the leak test); the pushed copies
+are for the tenant graph view / showing judges.
+
+> **VERIFY:** `cognee.serve()` kwargs (`url`/`api_key`) and `cognee.push()` arg name
+> (`dataset_name` vs `datasets`). Confirm with:
+> ```bash
+> uv run python -c "import cognee,inspect;print(inspect.signature(cognee.serve));print(inspect.signature(cognee.push))"
+> ```
+> The code already falls back between the common shapes, but adjust `brain/config.py:connect_cloud()`
+> and `brain/ingest.py:push_datasets()` if your version differs.
+
+Apply the **$35 onsite credits** to your tenant to cover the push/hosting.
 
 ---
 

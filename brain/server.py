@@ -26,6 +26,12 @@ _WRITE_LOCK = asyncio.Lock()
 @app.on_event("startup")
 async def _startup() -> None:
     config.configure_cognee()
+    if config.cognee_cloud_enabled():
+        try:
+            await config.connect_cloud()
+            print(f"[server] connected to Cognee tenant: {config.COGNEE_SERVICE_URL}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[server] Cognee cloud connect failed (continuing local): {exc}")
 
 
 # --------------------------------------------------------------------------- models
@@ -186,6 +192,19 @@ async def api_outcome(session_id: str, body: OutcomeBody) -> dict:
     today = date.fromisoformat(body.today) if body.today else None
     async with _WRITE_LOCK:
         return await records.record_outcome(session_id, body.rating, body.text, today=today)
+
+
+class PushBody(BaseModel):
+    datasets: list[str] | None = None
+
+
+@app.post("/api/push")
+async def api_push(body: PushBody) -> dict:
+    """Push locally-built sliced datasets to the hosted Cognee tenant."""
+    from . import ingest as ingest_mod
+
+    async with _WRITE_LOCK:
+        return await ingest_mod.push_datasets(body.datasets)
 
 
 @app.get("/api/due")

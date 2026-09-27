@@ -154,5 +154,11 @@ def stats() -> None:
     _print(_get("/api/stats"))
 
 
+@app.command()
+def push(dataset: list[str] = typer.Option(None, "--dataset", help="repeatable; default = all")) -> None:
+    """Push locally-built sliced datasets to your hosted Cognee tenant."""
+    _print(_post("/api/push", {"datasets": list(dataset) if dataset else None}))
+
+
 if __name__ == "__main__":
     app()

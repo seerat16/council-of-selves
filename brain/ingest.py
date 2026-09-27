@@ -7,7 +7,7 @@ from pathlib import Path
 
 import cognee
 
-from .config import DATA_DIR, INBOX_DIR, TIMELINE_DATASET
+from .config import DATA_DIR, INBOX_DIR, RECORDS_DATASET, TIMELINE_DATASET
 from .entries import load_entries, node_sets, render
 from .eras import era_for, load_eras, present_era
 from .prompts import load_prompt
@@ -58,6 +58,42 @@ async def ingest_all(path: Path = DATA_DIR, reset: bool = False, temporal: bool 
         counts[TIMELINE_DATASET] = len(entries)
 
     return counts
+
+
+async def push_datasets(datasets: list[str] | None = None) -> dict:
+    """Upload locally-built (already time-sliced) datasets to your hosted tenant.
+
+    The datasets are sliced by construction (asof_<era> holds only entries <= era.end),
+    so they arrive on the tenant still sliced. Requires COGNEE_SERVICE_URL +
+    COGNEE_API_KEY in .env.
+
+    VERIFY: `cognee.push()` argument name (`dataset_name` vs `datasets`) against your
+    installed cognee — run `python -c "import cognee,inspect;print(inspect.signature(cognee.push))"`.
+    """
+    from . import config
+
+    if not config.cognee_cloud_enabled():
+        return {
+            "pushed": [],
+            "note": "COGNEE_SERVICE_URL / COGNEE_API_KEY not set; nothing to push.",
+        }
+
+    await config.connect_cloud()
+
+    if datasets is None:
+        datasets = [e.dataset for e in load_eras()] + [TIMELINE_DATASET, RECORDS_DATASET]
+
+    pushed, errors = [], {}
+    for ds in datasets:
+        try:
+            try:
+                await cognee.push(dataset_name=ds)  # VERIFY arg name
+            except TypeError:
+                await cognee.push(datasets=[ds])
+            pushed.append(ds)
+        except Exception as exc:  # noqa: BLE001
+            errors[ds] = str(exc)
+    return {"pushed": pushed, "errors": errors, "service_url": config.COGNEE_SERVICE_URL}
 
 
 async def ingest_inbox() -> dict:
