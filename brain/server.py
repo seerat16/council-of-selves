@@ -229,28 +229,53 @@ async def api_due(today: str | None = None) -> list[dict]:
 
 # --------------------------------------------------------------------------- graph + UI
 @app.get("/graph", response_class=HTMLResponse)
-async def api_graph() -> HTMLResponse:
-    """Cognee graph visualization. VERIFY the visualize API against installed cognee."""
-    try:
-        import cognee
+async def api_graph(dataset: str | None = None) -> HTMLResponse:
+    """Cognee graph visualization.
 
-        # Newer cognee: cognee.visualize_graph() returns HTML or writes a file.
-        html = await cognee.visualize_graph()  # type: ignore
+    With ENABLE_BACKEND_ACCESS_CONTROL=true, cognee requires a dataset. Default to the
+    present era (asof_now); override with ?dataset=asof_grind_fall etc.
+    VERIFY the visualize API + arg name against the installed cognee.
+    """
+    from pathlib import Path
+
+    import cognee
+
+    from .eras import present_era
+
+    ds = dataset or present_era().dataset
+
+    # Try the common call shapes; cognee's arg name varies by version.
+    last_exc = None
+    for call in (
+        lambda: cognee.visualize_graph(dataset_name=ds),
+        lambda: cognee.visualize_graph(datasets=[ds]),
+        lambda: cognee.visualize_graph(dataset=ds),
+        lambda: cognee.visualize_graph(ds),
+        lambda: cognee.visualize_graph(),
+    ):
+        try:
+            html = await call()  # type: ignore
+        except TypeError as exc:
+            last_exc = exc
+            continue
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            continue
+        # Success: html may be markup or a file path.
         if isinstance(html, str) and "<html" in html.lower():
             return HTMLResponse(html)
-        # If it wrote a file path, read it.
-        from pathlib import Path
-
         p = Path(str(html))
         if p.exists():
             return HTMLResponse(p.read_text())
         return HTMLResponse(f"<pre>graph rendered to: {html}</pre>")
-    except Exception as exc:  # noqa: BLE001
-        return HTMLResponse(
-            f"<h3>Graph visualization unavailable</h3><pre>{exc}</pre>"
-            "<p>VERIFY cognee.visualize_graph() against the installed version.</p>",
-            status_code=200,
-        )
+
+    return HTMLResponse(
+        f"<h3>Graph visualization unavailable</h3>"
+        f"<p>dataset tried: <code>{ds}</code></p><pre>{last_exc}</pre>"
+        "<p>Add <code>?dataset=asof_now</code> (or another dataset) to the URL, "
+        "or VERIFY cognee.visualize_graph() against the installed version.</p>",
+        status_code=200,
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
