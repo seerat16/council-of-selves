@@ -1,0 +1,20 @@
+---
+id: memory-sync
+name: Memory Sync
+description: Ingest new inbox entries into the present era + timeline; past selves stay frozen
+schedule: "0 */6 * * *"
+enabled: true
+executionMode: automated
+targeting:
+  agents:
+    - chair
+author: Council of Selves
+---
+
+# Memory Sync
+
+1. Run `selves ingest --inbox`.
+2. Report the counts returned (how many new entries were ingested and moved).
+
+New entries only ever touch the present-era dataset and the timeline. Past-self datasets
+are immutable by construction.

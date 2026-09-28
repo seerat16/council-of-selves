@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Council of Selves</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0d17; --panel: #151827; --panel2: #1c2033; --line: #2a2f45;
+    --text: #e8eaf2; --muted: #9aa0b8; --accent: #A78BFA; --chip: #232842;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+  header { padding: 22px 28px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: .3px; }
+  header .tag { color: var(--muted); font-style: italic; }
+  main { max-width: 1120px; margin: 0 auto; padding: 22px 28px 80px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  input[type=text] { flex: 1; min-width: 280px; background: var(--panel2);
+    border: 1px solid var(--line); color: var(--text); border-radius: 10px;
+    padding: 12px 14px; font-size: 15px; }
+  button { background: var(--accent); color: #16111f; border: 0; border-radius: 10px;
+    padding: 12px 18px; font-weight: 600; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .toggle button { background: var(--panel2); color: var(--muted); border-radius: 0; padding: 10px 14px; font-weight: 500; }
+  .toggle button.active { background: var(--accent); color: #16111f; }
+  select { background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 10px; padding: 11px 12px; }
+  .tabs { display: flex; gap: 8px; margin: 22px 0 16px; border-bottom: 1px solid var(--line); }
+  .tabs button { background: transparent; color: var(--muted); border: 0; border-bottom: 2px solid transparent;
+    border-radius: 0; padding: 10px 6px; font-weight: 600; }
+  .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .card .band { height: 6px; }
+  .card .body { padding: 16px 18px; }
+  .card h3 { margin: 0 0 2px; font-size: 16px; }
+  .knows { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+  .vote { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 9px;
+    border-radius: 999px; background: var(--chip); margin-right: 6px; }
+  .vote.final { outline: 1px solid var(--accent); }
+  .changed { font-size: 11px; color: #34D399; font-weight: 700; margin-left: 4px; }
+  .md { font-size: 14px; }
+  .md :is(h1,h2,h3) { font-size: 15px; margin: 12px 0 6px; }
+  .md table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  .md th, .md td { border: 1px solid var(--line); padding: 5px 7px; text-align: left; }
+  .chip { display: inline-block; font-size: 11px; background: var(--chip); color: var(--accent);
+    border-radius: 6px; padding: 1px 6px; margin: 1px 2px; }
+  details { margin-top: 8px; } summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .full { grid-column: 1 / -1; }
+  .verdict { border-color: var(--accent); }
+  .status { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .matrix { border-collapse: collapse; } .matrix td, .matrix th { border: 1px solid var(--line); padding: 8px 10px; font-size: 13px; }
+  .pass { color: #34D399; } .fail { color: #F87171; font-weight: 700; }
+  .muted { color: var(--muted); } .err { color: #F87171; white-space: pre-wrap; }
+  iframe { width: 100%; height: 620px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  label.f { display:block; margin: 8px 0 4px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚖️ Council of Selves</h1>
+  <span class="tag">Before you decide, ask everyone you've been.</span>
+</header>
+<main>
+  <div class="row">
+    <input id="dilemma" type="text" placeholder="Describe a decision you're facing…" />
+    <div class="toggle" id="modeToggle">
+      <button data-mode="local" class="active">Local</button>
+      <button data-mode="clawmax">ClawMax</button>
+    </div>
+    <button id="convene">Convene</button>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <select id="sessionPicker"><option value="">— past sessions —</option></select>
+    <span id="hint" class="status"></span>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button data-tab="council" class="active">Council</button>
+    <button data-tab="checkins">Check-ins</button>
+    <button data-tab="graph">Memory Graph</button>
+    <button data-tab="leak">Leak Test</button>
+  </div>
+
+  <section id="tab-council">
+    <p id="status" class="status"></p>
+    <div id="brief" class="card full" style="display:none"><div class="band" style="background:var(--accent)"></div><div class="body md" id="briefBody"></div></div>
+    <div class="grid" id="selves" style="margin-top:16px"></div>
+    <div class="card full" id="historian" style="display:none;margin-top:16px"><div class="band" style="background:#64748b"></div><div class="body"><h3>The Historian</h3><div class="md" id="historianBody"></div></div></div>
+    <div class="card full verdict" id="verdict" style="display:none;margin-top:16px"><div class="band" style="background:var(--accent)"></div><div class="body"><h3>Decision Memo</h3><div class="md" id="verdictBody"></div></div></div>
+  </section>
+
+  <section id="tab-checkins" style="display:none">
+    <div id="dueList"></div>
+    <div class="card full" style="margin-top:14px"><div class="body">
+      <h3>Record an outcome</h3>
+      <label class="f">Session id</label>
+      <input id="oSession" type="text" placeholder="2026-…-northwind…" />
+      <label class="f">How did it turn out? (rating −2 regret … +2 best call)</label>
+      <select id="oRating"><option value="2">+2 best call</option><option value="1">+1 good</option><option value="0">0 neutral</option><option value="-1">−1 mixed</option><option value="-2">−2 regret</option></select>
+      <label class="f">What happened</label>
+      <input id="oText" type="text" placeholder="Took it with a 4-day week. Best call this year." />
+      <label class="f">Simulate date (optional, YYYY-MM-DD)</label>
+      <input id="oToday" type="text" placeholder="2026-10-28" />
+      <div class="row" style="margin-top:12px"><button id="oSubmit">Record outcome</button><span id="oMsg" class="status"></span></div>
+    </div></div>
+  </section>
+
+  <section id="tab-graph" style="display:none">
+    <p class="muted">Cognee graph visualization (served by the brain at <code>/graph</code>). Showing <code>asof_now</code>; change <code>?dataset=</code> to view an era.</p>
+    <iframe src="/graph?dataset=asof_now"></iframe>
+  </section>
+
+  <section id="tab-leak" style="display:none">
+    <p class="muted">Paste the JSON from <code>scripts/leak_test.py</code> (or the matrix it prints) to render the 4×4 proof of time isolation.</p>
+    <div id="leakGrid"></div>
+  </section>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let ERAS = [], MODE = "local", POLL = null, REPLAY = null;
+
+const params = new URLSearchParams(location.search);
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+function eraById(id){ return ERAS.find(e => e.id === id); }
+function md(text){ return marked.parse(dateChips(text || "")); }
+// turn [YYYY-MM-DD] into chips
+function dateChips(t){ return t.replace(/\[(\d{4}-\d{2}-\d{2})\]/g, '<span class="chip">$1</span>'); }
+
+async function loadEras(){
+  const d = await api("/api/eras");
+  ERAS = d.eras;
+}
+async function loadSessions(){
+  const list = await api("/api/sessions");
+  const sel = $("#sessionPicker");
+  sel.innerHTML = '<option value="">— past sessions —</option>' +
+    list.map(s => `<option value="${s.id}">${s.status||""} · ${s.dilemma.slice(0,50)}</option>`).join("");
+}
+
+function voteBadge(v, isFinal){
+  if(!v) return "";
+  return `<span class="vote ${isFinal?'final':''}">${v}</span>`;
+}
+
+function renderSession(s){
+  // brief
+  const files = s.files || {};
+  if(files["00_brief.md"]){ $("#brief").style.display=""; $("#briefBody").innerHTML = md(files["00_brief.md"]); }
+  // selves
+  const pastEras = ERAS.filter(e => !e.present);
+  $("#selves").innerHTML = pastEras.map(e => {
+    const test = files[`10_testimony_${e.id}.md`];
+    const cross = files[`30_cross_${e.id}.md`];
+    if(!test && !cross) return "";
+    const v = (s.votes && s.votes[e.id]) || {};
+    const changed = v.changed ? '<span class="changed">↺ changed their mind</span>' : "";
+    return `<div class="card"><div class="band" style="background:${e.color}"></div>
+      <div class="body">
+        <h3>${escapeHtml(s.owner_name || "")}${e.name}</h3>
+        <div class="knows">knows up to ${e.end}</div>
+        <div>${voteBadge(v.testimony)}${v.cross?voteBadge(v.cross,true):""}${changed}</div>
+        <div class="md" style="margin-top:8px">${test?md(test):'<span class="muted">…testifying…</span>'}</div>
+        ${cross?`<details open><summary>Cross-examination</summary><div class="md">${md(cross)}</div></details>`:""}
+      </div></div>`;
+  }).join("");
+  // historian
+  if(files["20_history.md"]){ $("#historian").style.display=""; $("#historianBody").innerHTML = md(files["20_history.md"]); }
+  // verdict
+  if(files["90_verdict.md"]){ $("#verdict").style.display=""; $("#verdictBody").innerHTML = md(files["90_verdict.md"]); }
+  // status
+  $("#status").textContent = `session ${s.id} · status: ${s.status}`;
+}
+
+function escapeHtml(x){ return (x||"").replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function clearCouncil(){
+  $("#brief").style.display="none"; $("#selves").innerHTML="";
+  $("#historian").style.display="none"; $("#verdict").style.display="none";
+}
+
+async function pollSession(id){
+  if(POLL) clearInterval(POLL);
+  const tick = async () => {
+    try {
+      const s = await api(`/api/sessions/${id}`);
+      renderSession(s);
+      if(["decided","closed","error"].includes(s.status)){ clearInterval(POLL); POLL=null; }
+    } catch(e){ $("#status").innerHTML = `<span class="err">${e.message}</span>`; }
+  };
+  await tick();
+  POLL = setInterval(tick, 2000);
+}
+
+async function convene(){
+  const dilemma = $("#dilemma").value.trim();
+  if(!dilemma) return;
+  clearCouncil();
+  $("#convene").disabled = true;
+  try {
+    const s = await api("/api/sessions", {method:"POST", headers:{'content-type':'application/json'},
+      body: JSON.stringify({dilemma, mode: MODE})});
+    $("#hint").textContent = s.note || "";
+    await loadSessions();
+    if(MODE === "local"){ await pollSession(s.id); }
+    else { $("#status").textContent = `session ${s.id} created. Run council-1-brief in ClawMax, then re-open this session.`; await pollSession(s.id); }
+  } catch(e){ $("#status").innerHTML = `<span class="err">${e.message}</span>`; }
+  finally { $("#convene").disabled = false; }
+}
+
+// --- Replay mode: reveal an existing session's files one by one ---
+async function replay(id){
+  const s = await api(`/api/sessions/${id}`);
+  const order = ["00_brief.md","20_history.md",
+    ...ERAS.filter(e=>!e.present).map(e=>`10_testimony_${e.id}.md`),
+    ...ERAS.filter(e=>!e.present).map(e=>`30_cross_${e.id}.md`),
+    "90_verdict.md"];
+  const shown = {files:{}, votes:s.votes, status:"replay", id:s.id, owner_name:s.owner_name};
+  clearCouncil();
+  for(const f of order){
+    if(!s.files[f]) continue;
+    shown.files[f] = s.files[f];
+    renderSession(shown);
+    await new Promise(r=>setTimeout(r, 1400));
+  }
+  renderSession(s);
+}
+
+// --- Check-ins ---
+async function loadDue(){
+  const today = "";
+  const due = await api("/api/due" + (today?`?today=${today}`:""));
+  $("#dueList").innerHTML = due.length
+    ? due.map(d=>`<div class="card full"><div class="body"><b>${escapeHtml(d.dilemma)}</b>
+        <div class="muted">check back ${d.check_back} · <span class="pill">${d.status}</span></div>
+        <button class="ghost" onclick="document.getElementById('oSession').value='${d.id}'">Record its outcome ↓</button></div></div>`).join("")
+    : '<p class="muted">No check-ins due. Use <code>selves due --today YYYY-MM-DD</code> to simulate one.</p>';
+}
+async function submitOutcome(){
+  const id = $("#oSession").value.trim();
+  const body = {rating: parseInt($("#oRating").value,10), text: $("#oText").value.trim(),
+    today: $("#oToday").value.trim() || null};
+  try {
+    const r = await api(`/api/sessions/${id}/outcome`, {method:"POST",
+      headers:{'content-type':'application/json'}, body: JSON.stringify(body)});
+    $("#oMsg").textContent = `Recorded: ${r.status}`;
+    await loadDue();
+  } catch(e){ $("#oMsg").innerHTML = `<span class="err">${e.message}</span>`; }
+}
+
+// --- Leak matrix (renders JSON produced by leak_test if pasted; else a hint) ---
+function renderLeak(){
+  $("#leakGrid").innerHTML = '<textarea id="leakJson" style="width:100%;height:120px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px" placeholder=\'Paste leak_test JSON here, e.g. {"header":[...],"rows":[...]}\'></textarea><div class="row" style="margin-top:8px"><button id="leakRender">Render matrix</button></div><div id="leakOut" style="margin-top:12px"></div>';
+  $("#leakRender").onclick = () => {
+    try {
+      const data = JSON.parse($("#leakJson").value);
+      const rows = data.rows || [];
+      const head = data.header || [];
+      let html = '<table class="matrix"><tr>' + head.map(h=>`<th>${escapeHtml(h)}</th>`).join("") + '</tr>';
+      for(const r of rows){ html += '<tr>' + r.map((c,i)=>{
+        const cls = /FAIL/.test(c) ? 'fail' : (/PASS/.test(c)?'pass':'');
+        return `<td class="${cls}">${escapeHtml(String(c))}</td>`;}).join("") + '</tr>'; }
+      html += '</table>';
+      $("#leakOut").innerHTML = html;
+    } catch(e){ $("#leakOut").innerHTML = `<span class="err">${e.message}</span>`; }
+  };
+}
+
+function setTab(name){
+  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("active", b.dataset.tab===name));
+  for(const t of ["council","checkins","graph","leak"]) $(`#tab-${t}`).style.display = (t===name?"":"none");
+  if(name==="checkins") loadDue();
+  if(name==="leak") renderLeak();
+}
+
+// --- wire up ---
+$("#modeToggle").addEventListener("click", e=>{
+  if(!e.target.dataset.mode) return;
+  MODE = e.target.dataset.mode;
+  document.querySelectorAll("#modeToggle button").forEach(b=>b.classList.toggle("active", b.dataset.mode===MODE));
+});
+$("#tabs").addEventListener("click", e=>{ if(e.target.dataset.tab) setTab(e.target.dataset.tab); });
+$("#convene").onclick = convene;
+$("#dilemma").addEventListener("keydown", e=>{ if(e.key==="Enter") convene(); });
+$("#sessionPicker").addEventListener("change", e=>{ if(e.target.value) pollSession(e.target.value); });
+$("#oSubmit").onclick = submitOutcome;
+
+(async function init(){
+  try { await loadEras(); await loadSessions(); } catch(e){ $("#status").innerHTML = `<span class="err">Brain server not reachable: ${e.message}</span>`; }
+  const replayId = params.get("replay");
+  const sessionId = params.get("session");
+  if(replayId){ $("#hint").textContent = "replay mode"; await replay(replayId); }
+  else if(sessionId){ if(params.get("checkins")!==null || location.hash==="#checkins"){ setTab("checkins"); $("#oSession").value=sessionId; } await pollSession(sessionId); }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+"""Paths, environment, and Cognee store locations.
+
+This module is import-safe without cognee installed: the cognee configuration is
+applied lazily via `configure_cognee()`, which the server (the sole Cognee owner)
+calls at startup. That keeps the CLI and Plan B runner cognee-free.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(ROOT / ".env")
+
+def _resolve_home() -> Path:
+    """Use SELVES_HOME if it exists; otherwise fall back to the repo root.
+
+    Guards against the .env.example placeholder (/home/you/...) being left in place,
+    which would otherwise crash Cognee store creation on non-Linux machines.
+    """
+    env_home = os.getenv("SELVES_HOME")
+    if env_home:
+        # Guard against a malformed .env value like "SELVES_HOME=/Users/..." where the
+        # variable name leaked into the value.
+        cleaned = env_home.strip().strip('"').strip("'")
+        if cleaned.startswith("SELVES_HOME="):
+            cleaned = cleaned.split("=", 1)[1]
+        p = Path(cleaned).expanduser()
+        # The definitive test: a valid home contains eras.yaml.
+        if (p / "eras.yaml").exists():
+            return p
+        if p.exists():
+            return p
+        print(
+            f"[config] SELVES_HOME='{env_home}' is invalid (no eras.yaml there); "
+            f"falling back to repo root {ROOT}. Fix SELVES_HOME in .env."
+        )
+    return ROOT
+
+
+HOME = _resolve_home()
+DATA_DIR = HOME / os.getenv("SELVES_DATA", "data/seed")
+INBOX_DIR = HOME / "data/inbox"
+SESSIONS_DIR = HOME / "sessions"
+ERAS_FILE = HOME / "eras.yaml"
+PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+WEB_DIR = ROOT / "web"
+
+RECORDS_DATASET = "council_records"
+TIMELINE_DATASET = "timeline"
+
+OWNER = os.getenv("SELVES_OWNER", "Alex")
+BRAIN_URL = os.getenv("SELVES_BRAIN_URL", "http://localhost:8765")
+
+# Council LLM provider: "anthropic" (default) or "ollama" (free, local).
+COUNCIL_PROVIDER = os.getenv("SELVES_LLM_PROVIDER", "anthropic").lower()
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
+
+# Model names differ by provider; defaults suit each.
+if COUNCIL_PROVIDER == "ollama":
+    CHAIR_MODEL = os.getenv("SELVES_CHAIR_MODEL", "llama3.1")
+    SELF_MODEL = os.getenv("SELVES_SELF_MODEL", "llama3.1")
+else:
+    CHAIR_MODEL = os.getenv("SELVES_CHAIR_MODEL", "claude-sonnet-5")
+    SELF_MODEL = os.getenv("SELVES_SELF_MODEL", "claude-haiku-4-5-20251001")
+
+COGNEE_DATA = HOME / ".cognee/data"
+COGNEE_SYSTEM = HOME / ".cognee/system"
+
+# --- Hosted Cognee tenant (platform.cognee.ai) ---
+# When both are set, `cognee.serve()` picks them up from the environment and the
+# `selves push` command uploads the locally-built sliced datasets to your tenant.
+COGNEE_SERVICE_URL = os.getenv("COGNEE_SERVICE_URL")  # e.g. https://<tenant>.aws.cognee.ai
+COGNEE_API_KEY = os.getenv("COGNEE_API_KEY")
+
+
+def cognee_cloud_enabled() -> bool:
+    return bool(COGNEE_SERVICE_URL and COGNEE_API_KEY)
+
+
+_cognee_configured = False
+
+
+def configure_cognee() -> None:
+    """Point Cognee's stores inside the project so they can be snapshotted/copied.
+
+    Called once by the server at startup. VERIFY the exact config setter names
+    against the installed cognee version (Section 8.1); adjust here if they differ.
+    """
+    global _cognee_configured
+    if _cognee_configured:
+        return
+    import cognee
+
+    COGNEE_DATA.mkdir(parents=True, exist_ok=True)
+    COGNEE_SYSTEM.mkdir(parents=True, exist_ok=True)
+    # VERIFY: setter names. Newer cognee exposes cognee.config.data_root_directory /
+    # system_root_directory. If the signature differs, adapt without changing intent.
+    try:
+        cognee.config.data_root_directory(str(COGNEE_DATA))
+        cognee.config.system_root_directory(str(COGNEE_SYSTEM))
+    except AttributeError:
+        # Fallback for alternative config surfaces.
+        cognee.config.set("data_root_directory", str(COGNEE_DATA))
+        cognee.config.set("system_root_directory", str(COGNEE_SYSTEM))
+    _cognee_configured = True
+
+
+async def connect_cloud() -> bool:
+    """Attach the SDK to your hosted Cognee tenant via `cognee.serve()`.
+
+    Per the Cognee docs, `cognee.serve()` reads COGNEE_SERVICE_URL + COGNEE_API_KEY
+    from the environment (already loaded from .env above). We also pass them
+    explicitly as a belt-and-braces fallback. No-op (returns False) if the tenant
+    env vars aren't set, so the local-only flow is unaffected.
+
+    VERIFY: `cognee.serve()` kwarg names (url/api_key) against your installed version.
+    """
+    if not cognee_cloud_enabled():
+        return False
+    import cognee
+
+    try:
+        await cognee.serve(url=COGNEE_SERVICE_URL, api_key=COGNEE_API_KEY)
+    except TypeError:
+        # Some versions read only from env vars and take no kwargs.
+        await cognee.serve()
+    return True

@@ -1,0 +1,22 @@
+---
+id: council-2-history
+name: Council 2 — History
+description: The Historian reports patterns, base rates and contradictions (parallel with testimony)
+schedule: manual
+enabled: true
+executionMode: automated
+targeting:
+  agents:
+    - historian
+author: Council of Selves
+# dependsOn: [council-1-brief]   # VERIFY exact DAG field name/shape against the spec
+---
+
+# History
+
+1. Run `selves session current` and `selves session show`.
+2. Follow your SOUL.md: `selves history -q "<dilemma>"` plus at least 2 follow-up history
+   queries (e.g. "decisions made after low-rated weeks", "times I changed my mind about <topic>").
+3. Write `$SELVES_HOME/sessions/<id>/20_history.md` (record table, base rate, patterns,
+   contradictions between eras, past council verdicts).
+4. Reply `DONE historian`.

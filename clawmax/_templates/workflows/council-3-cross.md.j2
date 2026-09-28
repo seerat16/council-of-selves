@@ -1,0 +1,23 @@
+---
+id: council-3-cross
+name: Council 3 — Cross-examination
+description: Each self rebuts the others and the Historian, and may change its vote
+schedule: manual
+enabled: true
+executionMode: automated
+targeting:
+  tags:
+    - self
+author: Council of Selves
+# dependsOn: [council-2-testimony, council-2-history]   # VERIFY DAG field/shape
+---
+
+# Cross-examination
+
+1. Run `selves session show` and read the other selves' testimonies and `20_history.md`.
+2. Follow your SOUL.md: address the self you disagree with most (by era name), respond to
+   the Historian pattern most uncomfortable for you, and change your vote only on evidence
+   you can cite `[YYYY-MM-DD]`. Stay in your era.
+3. Write `$SELVES_HOME/sessions/<id>/30_cross_<your era id>.md` (<=150 words, with
+   `**Vote:**` and `**Changed:** yes/no`).
+4. Reply `DONE <era id> cross vote=<vote> changed=<yes/no>`.
